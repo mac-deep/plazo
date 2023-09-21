@@ -40,7 +40,7 @@ export default function Sidebar() {
   return (
     <>
       <Button
-        className="fixed bottom-4 right-4  md:relative"
+        className="fixed bottom-4 right-4  md:relative md:bottom-0 md:right-0"
         variant="black"
         onClick={() => sidebarRef.current?.showModal()}
       >
