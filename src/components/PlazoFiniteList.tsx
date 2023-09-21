@@ -1,8 +1,14 @@
-import PlazoItem from './PlazoItem';
+import PlazoFiniteItem from './PlazoFiniteItem';
 import { useGetPlazosByUserId } from '../hooks/usePlazo';
 
 export default function PlazoList() {
-  const { isLoading, isFetched, isError, error, data: plazoList } = useGetPlazosByUserId();
+  const {
+    isLoading,
+    isFetched,
+    isError,
+    error,
+    data: plazoList,
+  } = useGetPlazosByUserId({ type: 'FINITE' });
 
   if (isLoading) {
     return (
@@ -15,13 +21,14 @@ export default function PlazoList() {
   }
 
   if (isError) return <p>{error as string}</p>;
-  if (isFetched && !plazoList) return <p>No Plazo Found</p>;
+  if (isFetched && !plazoList) return <p>No Finite Plazo Found</p>;
 
   return (
     <>
-      <h2>Ongoing Plazo List:</h2>
       <ul className="flex flex-col gap-4">
-        {plazoList?.map((plazo) => <PlazoItem plazo={plazo} key={plazo.id} />)}
+        {plazoList?.map((plazo) => (
+          <PlazoFiniteItem plazo={plazo} key={plazo.id} />
+        ))}
       </ul>
     </>
   );

@@ -1,13 +1,15 @@
 import Button from './Button';
-import Dialog from './Dialog';
 import moment from 'moment';
 import { useAuth } from '../hooks/useAuth';
 import { useSignIn, useSignOut } from '../service/auth';
+import { useRef } from 'react';
 
 export default function Sidebar() {
   const { user, loading } = useAuth();
   const { signInWithGoogle } = useSignIn();
   const { logout } = useSignOut();
+
+  const sidebarRef = useRef<HTMLDialogElement>(null);
 
   const handleSignOut = async () => {
     const { error } = await logout();
@@ -37,12 +39,19 @@ export default function Sidebar() {
 
   return (
     <>
-      <Button variant="black" onClick={() => dialogSidebar.showModal()}>
+      <Button
+        className="fixed bottom-4 right-4  md:relative"
+        variant="black"
+        onClick={() => sidebarRef.current?.showModal()}
+      >
         MENU
       </Button>
-      <Dialog id="dialogSidebar" className="">
+      <dialog ref={sidebarRef}>
         <aside className="flex flex-col justify-between fixed p-4 bg-black text-white right-0 top-0 bottom-0 w-full md:w-80">
-          <button className="absolute top-0 right-0 m-4" onClick={() => dialogSidebar.close()}>
+          <button
+            className="absolute top-0 right-0 m-4"
+            onClick={() => sidebarRef.current?.close()}
+          >
             [X]
           </button>
           <div className="flex-col flex items-start w-full font-light">
@@ -60,7 +69,7 @@ export default function Sidebar() {
             {/* <Button variant="red">Delete User</Button> */}
           </div>
         </aside>
-      </Dialog>
+      </dialog>
     </>
   );
 }

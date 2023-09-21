@@ -1,9 +1,20 @@
 import { SupabaseClient } from '@supabase/supabase-js';
 import { Database } from '../types/database.types';
-import { PlazoPayloadType } from '../types/plazo.types';
+import { PlazoPayloadType, PlazoType } from '../types/plazo.types';
 
-export const getPlazosByUserId = (client: SupabaseClient<Database>, uid: string) => {
-  return client.from('Plazo').select('*').eq('userId', uid).order('endDate', { ascending: true });
+export const getPlazosByUserId = (
+  client: SupabaseClient<Database>,
+  params: {
+    uid: string;
+    type: PlazoType['type'];
+  }
+) => {
+  return client
+    .from('Plazo')
+    .select('*')
+    .eq('userId', params.uid)
+    .eq('type', params.type)
+    .order('endDate', { ascending: true });
 };
 
 export const updatePlazoById = (
@@ -26,11 +37,12 @@ export const createPlazo = (
   params: {
     uid: string;
     payload: PlazoPayloadType;
+    type: PlazoType['type'];
   }
 ) => {
   return client
     .from('Plazo')
-    .insert({ ...params.payload, userId: params.uid })
+    .insert({ userId: params.uid, type: params.type, ...params.payload })
     .select('*')
     .single();
 };

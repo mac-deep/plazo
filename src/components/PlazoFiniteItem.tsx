@@ -1,10 +1,7 @@
-// @ts-nocheck
-
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import moment from 'moment';
-import { PlazoPayloadType, PlazoType } from '../types/plazo.types';
-import PlazoForm from './PlazoForm';
-import Dialog from './Dialog';
+import { PlazoType } from '../types/plazo.types';
+import PlazoForm from './PlazoFiniteForm';
 import { useDeletePlazoMutation, useUpdatePlazoMutation } from '../hooks/usePlazo';
 
 type PlazoItemProps = {
@@ -12,7 +9,7 @@ type PlazoItemProps = {
 };
 
 export default function PlazoItem({ plazo }: PlazoItemProps) {
-  const edit_plazo = `edit_plazo_${plazo.id}`;
+  const editPlazoRef = useRef<HTMLDialogElement>(null);
 
   const [showAction, setShowAction] = useState(false);
 
@@ -20,12 +17,8 @@ export default function PlazoItem({ plazo }: PlazoItemProps) {
     setShowAction(!showAction);
   };
 
-  const updatePlazoMutation = useUpdatePlazoMutation();
-  const deletePlazoMutation = useDeletePlazoMutation();
-
-  const handleUpdatePlazo = async (formdata: PlazoPayloadType): Promise<void> => {
-    updatePlazoMutation.mutate({ id: plazo.id, payload: formdata });
-  };
+  const updatePlazoMutation = useUpdatePlazoMutation({ plazoId: plazo.id, type: plazo.type });
+  const deletePlazoMutation = useDeletePlazoMutation({ type: 'FINITE' });
 
   const handleDeletePlazo = async (): Promise<void> => {
     const isConfirm = confirm(`Are you sure you want to delete ${plazo.title}  plazo?`);
@@ -35,14 +28,14 @@ export default function PlazoItem({ plazo }: PlazoItemProps) {
   };
 
   const handleCloseForm = () => {
-    window[edit_plazo].close();
+    editPlazoRef.current?.close();
   };
 
   return (
     <>
-      <li className="cursor-pointer">
+      <li className="cursor-pointer border  px-4 py-2 hover:ring-2 ring-black">
         <div
-          className="border border-black flex gap-5 justify-between flex-1 px-4 py-2 items-start lg:items-center hover:ring-2 ring-black"
+          className="flex gap-5 justify-between flex-1 items-start lg:items-center"
           onClick={toggleShowAction}
         >
           <div className="flex-1 flex lg:gap-4 flex-col lg:flex-row lg:items-center">
@@ -57,36 +50,37 @@ export default function PlazoItem({ plazo }: PlazoItemProps) {
             <p className="text-xs">Days left</p>
           </div>
         </div>
+
         {showAction && (
           <>
-            <div className="flex ">
+            <div className="flex gap-2">
               <button
-                onClick={() => window[edit_plazo].showModal()}
+                onClick={() => editPlazoRef.current?.showModal()}
                 title="Edit"
-                className="p-2 border border-black w-full"
+                className="px-2 py-1 text-sm border border-black"
               >
                 Edit
               </button>
               <button
                 onClick={handleDeletePlazo}
                 title="Delete"
-                className="p-2 border border-black w-full"
+                className="px-2 py-1 text-sm border border-black"
               >
                 Delete
               </button>
             </div>
-            <Dialog
+            <dialog
               key={plazo.id}
-              id={`edit_plazo_${plazo.id}`}
+              ref={editPlazoRef}
               className="modal borderb relative w-full lg:w-96 mx-auto mt-auto lg:mb-auto mb-4"
             >
               <PlazoForm
                 type="edit"
-                onSubmit={handleUpdatePlazo}
+                mutation={updatePlazoMutation}
                 onClose={handleCloseForm}
                 values={plazo}
               />
-            </Dialog>
+            </dialog>
           </>
         )}
       </li>

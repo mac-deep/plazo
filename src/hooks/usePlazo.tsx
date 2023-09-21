@@ -1,108 +1,124 @@
-// @ts-nocheck
-
-import { useMutation, useQuery, useQueryClient } from 'react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import useSupabase from './useSupabase';
 import { useAuth } from './useAuth';
 import { createPlazo, deletePlazoById, getPlazosByUserId, updatePlazoById } from '../queries/plazo';
-import { PlazoPayloadType } from '../types/plazo.types';
-import { useState } from 'react';
+import { PlazoPayloadType, PlazoType } from '../types/plazo.types';
+import { PostgrestError } from '@supabase/supabase-js';
 
-export function useGetPlazosByUserId() {
+export function useGetPlazosByUserId({ type }: { type: PlazoType['type'] }) {
   const client = useSupabase();
   const { user } = useAuth();
 
   return useQuery({
-    queryKey: ['plazos', user?.id],
+    queryKey: ['plazos', type],
     queryFn: async () => {
       if (user?.id) {
-        return getPlazosByUserId(client, user?.id).then((result) => result.data);
+        const { data, error } = await getPlazosByUserId(client, {
+          type: type,
+          uid: user.id,
+        });
+
+        if (error) throw new Error(`${error.message}: ${error.details}`);
+
+        return data;
       }
     },
   });
 }
 
-/**
- * A Hook for creating new plazo.
- * @param {string} uid - UserId of the plazo creator.
- */
-export function useCreatePlazoMutation() {
-  const [loading, setLoading] = useState<boolean>();
+export function useCreatePlazoMutation({ type }: { type: PlazoType['type'] }) {
   const client = useSupabase();
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const uid = user?.id;
 
-  const createPlazoMutation = useMutation(
+  return useMutation<PlazoType | undefined, PostgrestError, PlazoPayloadType, unknown>(
     async (payload: PlazoPayloadType) => {
       if (uid) {
-        return createPlazo(client, { uid, payload }).then((result) => result.data);
+        const { error: createError, data } = await createPlazo(client, { uid, payload, type });
+
+        if (createError) {
+          throw createError;
+        }
+
+        return data;
       }
     },
     {
-      onMutate: () => setLoading(true),
-      onSuccess: () => queryClient.refetchQueries(['plazos', uid]),
-      onSettled: () => setLoading(false),
+      onSuccess: () => queryClient.invalidateQueries(['plazos', type]),
     }
   );
-  return { createPlazoMutation, loading };
 }
 
-export function useUpdatePlazoMutation() {
+export function useUpdatePlazoMutation({
+  type,
+  plazoId,
+}: {
+  type: PlazoType['type'];
+  plazoId: string;
+}) {
   const client = useSupabase();
   const queryClient = useQueryClient();
-  const { user } = useAuth();
+
   return useMutation(
-    async ({ id, payload }: { id: string; payload: PlazoPayloadType }) => {
-      return updatePlazoById(client, { id, payload }).then((result) => result.data);
+    async (payload: PlazoPayloadType) => {
+      const { data, error: updateError } = await updatePlazoById(client, { id: plazoId, payload });
+
+      if (updateError) {
+        throw updateError;
+      }
+
+      return data;
     },
     {
-      onMutate: async ({ payload }) => {
-        await queryClient.cancelQueries('plazos');
-        const snapshot = queryClient.getQueryData('plazos');
+      //   onMutate: async (variables) => {
+      //     await queryClient.cancelQueries(['plazos', type]);
+      //     const snapshot = queryClient.getQueryData(['plazos']);
 
-        queryClient.setQueryData(['plazos', user?.id], (old: any[]) => {
-          const i = old.findIndex((i: unknown) => i.id == i);
-          old[i] = payload;
-          // [...old.filter((i) => i.id !== id),payload]
-          return old;
-        });
+      //     queryClient.setQueryData(['plazos', type], (old: PlazoPayload[] | undefined) => {
+      //       if (!old) return;
+      //       const i = old.findIndex((item: PlazoType | unknown) => item.id == i);
+      //       old[i] = { ...variables };
+      //       return old;
+      //     });
 
-        return { snapshot };
-      },
-      // onSuccess: (data, variables) => queryClient.refetchQueries(['plazo', variables.id]),
+      //     return { snapshot };
+      //   },
 
-      onError: (err, variables, context) => {
-        queryClient.setQueryData('plazos', context?.snapshot);
-      },
+      // onError: (err, variables, context) => {
+      //   queryClient.setQueryData(['plazos', type], context?.snapshot);
+      // },
       onSettled: () => {
-        // Always refetch after error or success
-        queryClient.invalidateQueries('plazos');
+        queryClient.invalidateQueries(['plazos', type]);
       },
     }
   );
 }
 
-export function useDeletePlazoMutation() {
+export function useDeletePlazoMutation({ type }: { type: PlazoType['type'] }) {
   const client = useSupabase();
   const queryClient = useQueryClient();
-  const { user } = useAuth();
 
   return useMutation(
     async ({ id }: { id: string }) => {
-      return deletePlazoById(client, { id }).then((result) => result.data);
+      const { data, error } = await deletePlazoById(client, { id });
+
+      if (error) {
+        throw error;
+      }
+
+      return data;
     },
     {
-      onMutate: async ({ id }) => {
-        await queryClient.cancelQueries('plazos');
-        const snapshot = queryClient.getQueryData('plazos');
-        queryClient.setQueryData(['plazos', user?.id], (old) => [
-          ...old.filter((i) => i.id !== id),
-        ]);
+      // onMutate: async ({ id }) => {
+      //   await queryClient.cancelQueries(['plazos', type]);
+      //   const snapshot = queryClient.getQueryData(['plazos', type]);
+      //   queryClient.setQueryData(['plazos', type], (old: PlazoType[] | u) => [...old.filter((i) => i.id !== id)]);
 
-        return { snapshot };
-      },
+      //   return { snapshot };
+      // },
       onSettled: () => {
-        queryClient.invalidateQueries('plazos');
+        queryClient.invalidateQueries(['plazos', type]);
       },
     }
   );

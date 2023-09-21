@@ -1,10 +1,13 @@
 import { useEffect } from 'react';
-import { useForm, SubmitHandler } from 'react-hook-form';
-import { PlazoFormType, PlazoPayloadType, PlazoType } from '../types/plazo.types';
+import { useForm } from 'react-hook-form';
+import { PlazoFiniteFormType, PlazoPayloadType, PlazoType } from '../types/plazo.types';
 import { DurationUnit } from '../types/moment.types';
 import moment from 'moment';
+import { UseMutationResult } from '@tanstack/react-query';
+import { PostgrestError } from '@supabase/supabase-js';
+import MultiPurposeBtn from './MultiPurposeBtn';
 
-const initFormState: PlazoFormType = {
+const initFormState: PlazoFiniteFormType = {
   title: '',
   startDate: moment(new Date().toLocaleDateString()).format('YYYY-DD-MM'),
   endDate: '',
@@ -25,13 +28,13 @@ const durationOptions: DurationOptionType[] = [
 ];
 
 type PlazoFormProps = {
-  values?: PlazoFormType | PlazoType;
-  onSubmit: SubmitHandler<PlazoPayloadType>;
+  values?: PlazoFiniteFormType | PlazoType;
+  mutation: UseMutationResult<PlazoType | undefined, unknown, PlazoPayloadType, unknown>;
   onClose: () => void;
   type: 'add' | 'edit';
 };
 
-const formToPayloadConverter = (payload: PlazoFormType | PlazoType): PlazoPayloadType => {
+const formToPayloadConverter = (payload: PlazoFiniteFormType | PlazoType): PlazoPayloadType => {
   return {
     endDate: payload.endDate,
     startDate: payload.startDate,
@@ -40,8 +43,8 @@ const formToPayloadConverter = (payload: PlazoFormType | PlazoType): PlazoPayloa
 };
 
 const plazoToFormConverter = (
-  payload: PlazoType | PlazoFormType | undefined
-): PlazoFormType | undefined => {
+  payload: PlazoType | PlazoFiniteFormType | undefined
+): PlazoFiniteFormType | undefined => {
   if (payload) {
     return {
       endDate: payload.endDate,
@@ -53,7 +56,7 @@ const plazoToFormConverter = (
   }
 };
 
-export default function NewForm({ values, type, onSubmit, onClose }: PlazoFormProps) {
+export default function NewForm({ values, type, mutation, onClose }: PlazoFormProps) {
   const {
     register,
     handleSubmit,
@@ -62,7 +65,7 @@ export default function NewForm({ values, type, onSubmit, onClose }: PlazoFormPr
     setValue,
     getValues,
     reset,
-  } = useForm<PlazoFormType>({
+  } = useForm<PlazoFiniteFormType>({
     values: plazoToFormConverter(values),
     defaultValues: initFormState,
   });
@@ -89,9 +92,32 @@ export default function NewForm({ values, type, onSubmit, onClose }: PlazoFormPr
     (type === 'add' && <>Add New Plazo!</>) ||
     (type === 'edit' && <p>Edit {getValues('title')} Plazo!</p>);
 
+  const { mutate, isLoading, error, isError, isSuccess } = mutation;
+  const mutationError = error as PostgrestError;
+  const onSubmit = async (formdata: PlazoPayloadType): Promise<void> => {
+    mutate(formdata);
+  };
+
+  useEffect(() => {
+    if (isSuccess) {
+      setTimeout(() => {
+        reset();
+        onClose();
+      }, 2000);
+    }
+  }, [isSuccess]);
+
   return (
-    <form onSubmit={handleSubmit((data) => onSubmit(formToPayloadConverter(data)))}>
-      <div className="col-span-2 gap-2 flex justify-between mb-4">
+    <form
+      onSubmit={handleSubmit((data) => onSubmit(formToPayloadConverter(data)))}
+      className="grid grid-cols-2 gap-4"
+    >
+      {isError && (
+        <p className="bg-red-500  text-white">
+          {mutationError.details} {mutationError.message}
+        </p>
+      )}
+      <div className="col-span-2 gap-2 flex justify-between">
         <h3 className="flex-1 p-2 bg-black text-white font-bold text-lg">{formHeading}</h3>
         <button onClick={onClose}>[x]</button>
       </div>
@@ -134,14 +160,14 @@ export default function NewForm({ values, type, onSubmit, onClose }: PlazoFormPr
       </div>
 
       <div className="col-span-2 form-control w-full">
-        <label className="label">
+        <label className="label block">
           <span className="label-text">Will end on</span>
         </label>
         <input
           {...register('durationValue')}
           placeholder="6"
           type="number"
-          className="input input-bordered w-full"
+          className="input input-bordered w-1/2"
         />
         {errors.durationValue && (
           <label className="label">
@@ -157,34 +183,42 @@ export default function NewForm({ values, type, onSubmit, onClose }: PlazoFormPr
             </option>
           ))}
         </select>
+        {errors.durationUnit && <span>{errors.durationUnit.message}</span>}
       </div>
 
-      {errors.durationUnit && <span>{errors.durationUnit.message}</span>}
-      <p className="text-center w-full opacity-50 text-sm">OR enter End date</p>
-      <input
-        type="date"
-        {...register('endDate')}
-        onInput={(e) => {
-          const newDuration = moment(e.currentTarget.value).diff(
-            moment(watch('startDate')),
-            'days'
-          );
-          setValue('durationValue', newDuration);
-          setValue('durationUnit', 'days');
-        }}
-        className="input input-bordered w-full"
-      />
-      <div className="flex col-span-2 gap-4 mt-6">
+      <div className="col-span-2 form-control w-full">
+        <p className="text-center w-full opacity-50 text-sm">OR enter End date</p>
+        <input
+          type="date"
+          {...register('endDate')}
+          onInput={(e) => {
+            const newDuration = moment(e.currentTarget.value).diff(
+              moment(watch('startDate')),
+              'days'
+            );
+            setValue('durationValue', newDuration);
+            setValue('durationUnit', 'days');
+          }}
+          className="input input-bordered w-full"
+        />
+      </div>
+      <div className="flex col-span-2 gap-4 mt-4">
         <button
+          type="button"
           onClick={() => reset(initFormState)}
           className="col-span-2 w-full border border-black px-4 py-2"
         >
           Clear
         </button>
-        <button type="submit" className="col-span-2 w-full bg-black px-4 text-white py-2">
-          {type == 'add' && 'Add New'}
-          {type == 'edit' && 'Save'}
-        </button>
+        <MultiPurposeBtn
+          type="submit"
+          isLoading={isLoading}
+          isSuccess={isSuccess}
+          successMessage="Added!"
+          name="SAVE"
+          variant="black"
+          className="w-full"
+        />
       </div>
     </form>
   );
